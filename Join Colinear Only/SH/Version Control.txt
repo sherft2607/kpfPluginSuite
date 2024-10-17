@@ -1,0 +1,14 @@
+use Join Colinear Only_v.0.0.1.3dm
+0.0.1 - finds segments of surfaces 
+0.0.2 - started building python, started using simplify and extend method
+0.0.3 - seperating planar curve from curve
+0.0.4 - tried mesh techniques
+0.0.5 - colinear points works to an extent, certain edge cases not addressed
+
+use Join Colinear Only_v.0.0.2.3dm
+0.1.0 - works mostly, just doesnt sort points to be the same
+
+use Join Colinear Only_v.0.0.3.3dm
+0.2.0 - gives midpoint and segments
+
+1.0.0 - outputs colinear points

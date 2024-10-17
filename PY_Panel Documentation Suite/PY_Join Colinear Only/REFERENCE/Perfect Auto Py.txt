@@ -1,0 +1,332 @@
+"""Provides a scripting component.
+    Inputs:
+        x: The x script variable
+        y: The y script variable
+    Output:
+        a: The a output variable"""
+
+__author__ = "ndesbiens"
+__version__ = "2021.08.23"
+
+import rhinoscriptsyntax as rs
+import ghpythonlib.treehelpers as th
+import scriptcontext
+import Rhino
+import math
+
+#ANGLE = math.radians(HORIZONTAL_BACK_ANGLE)
+
+
+TOP_STEM_WIDTH = round(TOP_STEM_WIDTH)
+TOP_STEM_WIDTH += 1/3
+
+scriptcontext.doc = ghdoc
+scriptcontext.doc = Rhino.RhinoDoc.ActiveDoc
+O_TOL = .001
+rs.UnitAbsoluteTolerance(O_TOL * 100)
+scriptcontext.doc = ghdoc
+Ts = th.tree_to_list(Ts)
+
+
+T_SOLIDS = []
+T_TEE_BAR = []
+T_GROUPS = []
+TEMP = []
+CENTER = rs.CurveAreaCentroid(FLOOR_CRVS[3])[0]
+HIGHLIGHT = []
+
+def bake_em(gs):
+    for g in gs:
+        bake_it(g)
+def bake_it(g):
+    g = rs.coercegeometry(g)
+    scriptcontext.doc = Rhino.RhinoDoc.ActiveDoc
+    scriptcontext.doc.Objects.Add(g)
+    scriptcontext.doc = ghdoc
+
+def sa(s):
+    return rs.SurfaceArea(s)[0]
+    
+DEPTHS = []
+inc = (MAX_TOP_DEPTH-MIN_TOP_DEPTH)/(GROUP_COUNT-1)
+v = MIN_TOP_DEPTH
+DEPTH_GROUPS = []
+BASE_DEPTHS = []
+for i in range(GROUP_COUNT):
+    DEPTHS.append(int(round(v)))
+    v+=inc
+    DEPTH_GROUPS.append([])
+
+INTERP_EDGE_DEPTHS = []
+for i in range(len(DEPTH_GROUPS)):
+    v = i/(len(DEPTH_GROUPS)-1)
+    d = MIN_EDGE_DEPTH + v * (MAX_EDGE_DEPTH-MIN_EDGE_DEPTH)
+    INTERP_EDGE_DEPTHS.append(d)
+
+
+
+
+    
+for i in range(len(Ts)):
+
+    if i != -1:
+        t_bar,t_stem,t_srf = Ts[i]
+        
+        val = vals[i]
+        val *= (GROUP_COUNT-1)
+        val = round(val)
+        val = val/(GROUP_COUNT-1)
+        
+        depth = int(round(MIN_TOP_DEPTH + val * (MAX_TOP_DEPTH - MIN_TOP_DEPTH)))
+        depth_group = DEPTHS.index(depth)
+        
+        if OPTION == 1:
+            HORIZONTAL_EDGE_DEPTH = depth - DEPTH_DIFFERENCE
+        if OPTION == 2:
+            HORIZONTAL_EDGE_DEPTH = INTERP_EDGE_DEPTHS[depth_group]
+            TWIST_OPTION = 1
+            
+           
+        if TWIST_OPTION == 1:
+            HORIZONTAL_EDGE_WIDTH = (HORIZONTAL_CENTER_WIDTH/depth) * HORIZONTAL_EDGE_DEPTH
+            
+
+
+
+
+    
+        
+        BASE_STEM_DEPTH = round((depth * BASE_STEM_WIDTH)/TOP_STEM_WIDTH,6)
+        if not BASE_STEM_DEPTH in BASE_DEPTHS:
+            BASE_DEPTHS.append(BASE_STEM_DEPTH)
+        
+        pt1a = rs.CurveStartPoint(t_stem)
+        pt2a = rs.CurveEndPoint(t_stem)
+        vect = rs.SurfaceNormal(t_srf,rs.SurfaceClosestPoint(t_srf,pt1a))
+        vect.Z = 0
+        vect = rs.VectorUnitize(vect)
+        vect *= -BASE_STEM_DEPTH
+        pt1b = pt1a + vect
+        bc = rs.AddLine(pt1a,pt1b)
+        vect = rs.SurfaceNormal(t_srf,rs.SurfaceClosestPoint(t_srf,pt2a))
+        vect.Z = 0
+        vect = rs.VectorUnitize(vect)
+        vect *= -depth
+        pt2b = pt2a + vect
+        tc = rs.AddLine(pt2a,pt2b)
+        side_srf= rs.AddSweep2([bc,tc],[t_stem])[0]
+        
+        stem_peak = rs.DuplicateEdgeCurves(side_srf)[1]
+        
+        base_crv = rs.DuplicateEdgeCurves(t_srf)[3]
+        rs.ReverseCurve(base_crv)
+        p1 = rs.CurveClosestPoint(base_crv,pt1a)
+        p2 = rs.CurveDomain(base_crv)[1]
+        base_crv = rs.TrimCurve(base_crv,[p1,p2])
+        rs.ExtendCurveLength(base_crv,2,1,BASE_STEM_WIDTH-rs.CurveLength(base_crv))
+        p1 = rs.CurveClosestPoint(t_bar,pt2a)
+        p2 = rs.CurveDomain(t_bar)[1]
+        top_crv = rs.TrimCurve(t_bar,[p1,p2],False)
+        rs.ExtendCurveLength(top_crv,2,1,TOP_STEM_WIDTH-rs.CurveLength(top_crv))
+        
+    
+        back_srf= rs.AddSweep2([base_crv,top_crv],[t_stem])
+        if back_srf:
+            back_srf = back_srf[0]
+    
+            rs.ObjectType(back_srf)
+            stem_edge = rs.DuplicateEdgeCurves(back_srf)[1]
+            
+            front_srf = rs.AddLoftSrf([stem_peak,stem_edge])[0]
+            stem = rs.JoinSurfaces([side_srf,front_srf,back_srf])
+            rs.CapPlanarHoles(stem)
+            
+            pt3a = rs.CurveStartPoint(t_bar)
+            vect = rs.SurfaceNormal(t_srf,rs.SurfaceClosestPoint(t_srf,pt3a))
+            vect.Z = 0
+            vect = rs.VectorUnitize(vect)
+            
+            vect *= -HORIZONTAL_EDGE_DEPTH
+            pt3b = pt3a + vect
+            
+            pt4a = rs.CurveEndPoint(t_stem)
+            pt4b =rs.CurveEndPoint(stem_peak)
+            
+            edge_line_left = rs.AddLine(pt3a,pt3b)
+            center_line = rs.AddLine(pt4a,pt4b) #PEAK
+            
+            p1 = rs.CurveDomain(t_bar)[0]
+            p2 = rs.CurveClosestPoint(t_bar,pt4a)
+            back_edge_left = rs.TrimCurve(t_bar,[p1,p2],False)
+            left_top_srf = rs.AddSweep2([edge_line_left,center_line],[back_edge_left])
+    
+    
+            OL = rs.DuplicateSurfaceBorder(left_top_srf)
+            ol_bits = rs.ExplodeCurves(OL)
+            front_edge_left = ol_bits[1]
+            
+    
+            
+    
+            pt3a = rs.CurveEndPoint(t_bar)
+            vect = rs.SurfaceNormal(t_srf,rs.SurfaceClosestPoint(t_srf,pt3a))
+            vect.Z = 0
+            vect = rs.VectorUnitize(vect)
+            vect *= -HORIZONTAL_EDGE_DEPTH
+            pt3b = pt3a + vect
+    
+            edge_line_right = rs.AddLine(pt3a,pt3b)
+    
+            p2 = rs.CurveDomain(t_bar)[1]
+            p1 = rs.CurveClosestPoint(t_bar,pt4a)
+            back_edge_right = rs.TrimCurve(t_bar,[p1,p2],False)
+            right_top_srf = rs.AddSweep2([edge_line_right,center_line],[back_edge_right])
+    
+    
+            OL = rs.DuplicateSurfaceBorder(right_top_srf)
+            ol_bits = rs.ExplodeCurves(OL)
+            front_edge_right = ol_bits[1]
+            
+            sp = rs.CurveStartPoint(edge_line_left)
+            ep = rs.CurveMidPoint(edge_line_left)
+            ep.Z -= HORIZONTAL_EDGE_WIDTH
+            slant_edge_left = rs.AddLine(sp,ep)
+            sp = rs.CurveStartPoint(center_line)
+            ep = rs.CurveMidPoint(center_line)
+            ep.Z -= HORIZONTAL_CENTER_WIDTH
+            slant_edge_center = rs.AddLine(sp,ep)
+            slant_srf_left = rs.AddSweep2([slant_edge_left,slant_edge_center],[back_edge_left])[0]
+            
+            OL = rs.DuplicateSurfaceBorder(slant_srf_left)
+            ol_bits = rs.ExplodeCurves(OL)
+            left_mid_crv = ol_bits[1]
+            left_front_slant = rs.AddLoftSrf([left_mid_crv,front_edge_left])[0]
+        
+    
+            sp = rs.CurveStartPoint(edge_line_right)
+            ep = rs.CurveMidPoint(edge_line_right)
+            ep.Z -= HORIZONTAL_EDGE_WIDTH
+            slant_edge_right = rs.AddLine(sp,ep)
+            sp = rs.CurveStartPoint(center_line)
+            ep = rs.CurveMidPoint(center_line)
+            ep.Z -= HORIZONTAL_CENTER_WIDTH
+    
+            slant_srf_right = rs.AddSweep2([slant_edge_right,slant_edge_center],[back_edge_right])[0]
+            
+            OL = rs.DuplicateSurfaceBorder(slant_srf_right)
+            ol_bits = rs.ExplodeCurves(OL)
+            right_mid_crv = ol_bits[1]
+    
+            right_front_slant = rs.AddLoftSrf([right_mid_crv,front_edge_right])[0]
+    
+    
+    
+            C1 = rs.JoinCurves([back_edge_left,back_edge_right])
+            C2 = rs.JoinCurves([left_mid_crv,right_mid_crv])
+            C3 = rs.JoinCurves([front_edge_left,front_edge_right])
+            
+            ccrvs = [C1,C2,C3]
+            for j in range(len(ccrvs)):
+                c = ccrvs[j]
+                if type(c) is list:
+                    for k in range(len(c)-1,-1,-1):
+                        if not c[k]:
+                            c.pop(k)
+                    if len(c) == 1:
+                        ccrvs[j] = c[0]
+                    else:
+                        p1 = rs.CurveEndPoint(c[0])
+                        p2 = rs.CurveStartPoint(c[1])
+                        ep = (p1 + p2)/2
+                        s_crv = rs.AddInterpCurve([rs.CurveStartPoint(c[0]),rs.CurveMidPoint(c[0]),ep])
+                        e_crv = rs.AddInterpCurve([ep,rs.CurveMidPoint(c[1]),rs.CurveEndPoint(c[1])])
+                        ccrvs[j] = rs.JoinCurves([s_crv,e_crv])[0]
+                        
+            C1,C2,C3 = ccrvs
+            TOP = rs.AddLoftSrf([C3,C1])[0]
+
+            OL = rs.DuplicateSurfaceBorder(TOP,1)[0]
+            if rs.IsCurvePlanar(OL):
+                TOP = rs.AddPlanarSrf([OL])
+
+            tee_bar = rs.AddLoftSrf([C1,C2,C3],None,None,2)[0]
+ 
+            tee_bar = rs.JoinSurfaces([tee_bar,TOP])
+            
+           
+            rs.CapPlanarHoles(tee_bar)
+    
+
+            
+            TEE = rs.BooleanUnion([stem,tee_bar])
+            if not TEE:
+                TEE = [stem,tee_bar]
+            for j in range(len(TEE)-1,-1,-1):
+                if not rs.IsBrep(TEE[j]):
+                    TEE.pop(j)
+            
+            
+            
+            
+            
+            T_VOL = None
+            t_bits = []
+            for j in range(len(TEE)):
+                t = TEE[j]
+
+                test = rs.BooleanDifference(t,CUT_VOL,False)
+                if test:
+                    T_VOL = test[0]
+                else:
+                    lose_it = True
+                    test_pts = []
+                    ecs = rs.DuplicateEdgeCurves(t)
+                    for ec in ecs:
+                        cps = rs.CurvePoints(ec)
+                        for cp in cps:
+                            if not cp in test_pts:
+                                test_pts.append(cp)
+                    for bbpt in test_pts:
+                        if not rs.IsPointInSurface(CUT_VOL,bbpt):
+                            lose_it = False
+                            break
+                    if lose_it:
+                        T_VOL = None
+                    else:
+                        T_VOL = t
+                if T_VOL:
+                    T_SOLIDS.append(T_VOL)
+                    t_bits.append(T_VOL)
+        
+            if len(t_bits) > 0:
+                DEPTH_GROUPS[depth_group].append(t_bits)
+                
+
+t_boxes = []
+for t in T_BOXES:
+    test = rs.BooleanDifference(t,CUT_VOL,False)
+    if test:
+        T_VOL = test[0]
+    else:
+        lose_it = True
+        test_pts = []
+        ecs = rs.DuplicateEdgeCurves(t)
+        for ec in ecs:
+            cps = rs.CurvePoints(ec)
+            for cp in cps:
+                if not cp in test_pts:
+                    test_pts.append(cp)
+        for bbpt in test_pts:
+            if not rs.IsPointInSurface(CUT_VOL,bbpt):
+                lose_it = False
+                break
+        if lose_it:
+            T_VOL = None
+        else:
+            T_VOL = t
+    if T_VOL:
+        t_boxes.append(T_VOL)
+
+T_BOXES = t_boxes
+
+DEPTH_GROUPS = th.list_to_tree(DEPTH_GROUPS)

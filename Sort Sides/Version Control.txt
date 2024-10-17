@@ -1,0 +1,29 @@
+use Sort Sides_v.0.0.1.3dm
+0.0.1 - seperating points based on number, and implementing dot product/line sdl strategy
+0.0.2 - tried sorting points polar
+0.0.3 - tried surface planes 
+0.0.4 - tried rebuilding surfaces by division points
+0.0.5 - rotating vector 
+0.0.6 - tries c# for indices
+0.1.0 - get its mostly right based on top curve 
+0.2.0 - takes a list of points and surfaces to output combined based on count required
+0.2.1 - iterations of original
+0.2.2 - figuring out changes based on working gh script
+0.3.0 - sorting based on point count works and outputs points, and surface
+0.3.1 - outputs planes too
+0.3.2 - test to find top edge using ghpython
+0.3.3 - gives all edges 
+0.3.4 - works to an extent except some edge cases
+0.3.5 - tries doing it based on joes strategy of using line sdl towards z 
+0.3.6 - seperating based on vector direction ankill
+0.4.0 - starts giving me the planes flipped properly
+0.4.1 - created a method to create segments on surface based on points
+0.4.2 - tried comparing vector of surfaces with z axis of planes
+1.0.0 - is able to filter surfaces based on number of sided surfaces
+
+
+
+
+
+
+
